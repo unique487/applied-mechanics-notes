@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>應用力學 - 互動教學簡報</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Microsoft JhengHei',sans-serif;overflow:hidden;background:#0a0a2e;color:#fff}
+.slide{position:absolute;top:0;left:0;width:100%;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:60px;opacity:0;transform:scale(0.95);transition:all .6s cubic-bezier(.4,0,.2,1);pointer-events:none;overflow-y:auto}
+.slide.active{opacity:1;transform:scale(1);pointer-events:all}
+.slide::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at center,rgba(100,100,255,.1)0%,transparent 70%);z-index:-1}
+#title{background:linear-gradient(135deg,#0a0a2e 0%,#1a1a4e 50%,#0a0a2e 100%)}
+#title h1{font-size:4em;background:linear-gradient(45deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:20px;animation:float 3s ease-in-out infinite}
+#title p{font-size:1.2em;color:#8899cc}
+.chapter-slide{background:linear-gradient(135deg,#0f0f3a 0%,#1a1a5e 100%)}
+.chapter-slide h2{font-size:2.5em;color:#00d4ff;margin-bottom:10px}
+.chapter-slide .chapter-num{font-size:1em;color:#7b2ff7;letter-spacing:3px;margin-bottom:20px}
+.chapter-slide .content-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;max-width:1200px;margin-top:20px}
+.chapter-slide .content-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:15px;padding:20px;backdrop-filter:blur(10px);transition:transform .3s,box-shadow .3s}
+.content-card:hover{transform:translateY(-5px);box-shadow:0 10px 30px rgba(0,212,255,.2)}
+.content-card h3{color:#ffd700;margin-bottom:12px;font-size:1.2em}
+.content-card ul{list-style:none}
+.content-card li{padding:6px 10px;color:#ddddf0;font-size:1em;cursor:pointer;border-radius:6px;transition:all .2s}
+.content-card li:hover{background:rgba(0,212,255,.15);color:#fff;padding-left:16px}
+.content-card li::before{content:'▸ ';color:#00d4ff}
+.formula-box{background:rgba(0,0,0,.3);border-radius:10px;padding:15px;text-align:center;font-size:1.4em;color:#ffe066;margin:12px 0;font-family:'Times New Roman',serif;border-left:4px solid #00d4ff}
+.toggle-btn{background:none;border:none;color:#00d4ff;cursor:pointer;font-size:.85em;margin-left:12px;transition:color .3s;font-weight:bold}
+.toggle-btn:hover{color:#7b2ff7}
+/* Concept detail row between the two content cards */
+.concept-detail{display:none;grid-column:1/-1;background:rgba(0,0,0,.35);border:1px solid rgba(0,212,255,.25);border-radius:12px;padding:18px 22px;gap:16px;flex-direction:row;align-items:flex-start}
+.concept-detail.open{display:flex}
+.cd-left{flex:1}
+.cd-title{color:#00d4ff;font-size:1.5em;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center}
+.cd-chapter{font-size:.85em;color:#a855f7;margin-bottom:10px;font-weight:bold}
+.cd-desc{color:#e0e0f0;line-height:1.8;font-size:1.1em;margin-bottom:10px}
+.cd-formula{background:rgba(0,0,0,.35);border-left:4px solid #ffd700;border-radius:8px;padding:10px 16px;margin-bottom:8px;text-align:center;font-size:1.3em;color:#ffe066;font-family:'Times New Roman',serif}
+.cd-close{background:none;border:none;color:#8899cc;font-size:1.3em;cursor:pointer;padding:0 6px}
+.cd-close:hover{color:#ff6b6b}
+.cd-image{flex:0 0 auto;width:280px;cursor:zoom-in;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);transition:transform .2s;max-height:220px;object-fit:contain}
+.cd-image:hover{transform:scale(1.03)}
+/* Image zoom overlay — scroll to resize */
+.img-zoom-overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:none;overflow:hidden;background:rgba(0,0,0,.85);backdrop-filter:blur(5px);text-align:center}
+.img-zoom-overlay.open{display:block}
+.img-zoom-overlay.dragging{cursor:grabbing}
+.img-zoom-overlay img{border-radius:12px;border:2px solid rgba(0,212,255,.3);box-shadow:0 20px 60px rgba(0,0,0,.6);user-select:none;display:inline-block;vertical-align:middle;margin:20px 0}
+.img-zoom-close{position:fixed;top:16px;right:24px;z-index:10000;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:50%;width:44px;height:44px;font-size:1.4em;color:#d0d0ff;cursor:pointer;display:none;align-items:center;justify-content:center;transition:all .3s}
+.img-zoom-overlay.open .img-zoom-close{display:flex}
+.img-zoom-close:hover{background:rgba(255,80,80,.3);border-color:#ff6b6b;color:#ff6b6b;transform:scale(1.1)}
+/* Right panel — wordcloud only, compact */
+.right-panel{position:fixed;top:auto;bottom:16px;right:16px;width:300px;height:260px;z-index:100}
+.wordcloud-card{height:100%;background:rgba(15,15,40,.96);border:1px solid rgba(0,212,255,.3);border-radius:12px;padding:10px 12px;backdrop-filter:blur(15px);box-shadow:0 6px 24px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.wordcloud-card h3{color:#00d4ff;font-size:.75em;margin-bottom:4px;text-align:center}
+#wordcloud-container{width:100%;flex:1;border-radius:6px;background:rgba(0,0,0,.3);display:flex;flex-wrap:wrap;align-content:center;justify-content:center;padding:3px;overflow:hidden}
+.wc-word{display:inline-block;margin:2px 3px;padding:1px 4px;border-radius:4px;cursor:pointer;transition:transform .2s,opacity .2s;font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;line-height:1.2;white-space:nowrap;font-weight:bold}
+.wc-word:hover{transform:scale(1.15);opacity:1!important}
+.wc-bar{display:flex;gap:3px;margin-top:4px}
+.wc-bar input{flex:1;padding:4px 6px;border:1px solid rgba(0,212,255,.3);border-radius:5px;background:rgba(255,255,255,.1);color:#fff;font-size:.72em;outline:none;font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif}
+.wc-bar input:focus{border-color:#00d4ff}
+.wc-bar input::placeholder{color:rgba(255,255,255,.25)}
+.wc-bar button{padding:4px 8px;border:none;border-radius:5px;cursor:pointer;font-size:.72em;transition:transform .2s;font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif}
+.wc-submit{background:linear-gradient(45deg,#00d4ff,#7b2ff7);color:#fff}
+.wc-clear{background:rgba(255,80,80,.2);color:#ff6b6b}
+.wc-bar button:active{transform:scale(.95)}
+#word-options{width:100%;max-height:22px;overflow-y:hidden;display:flex;flex-wrap:wrap;gap:2px;margin-top:3px;padding:2px 3px;border-radius:4px;background:rgba(255,255,255,.03)}
+.word-chip{display:inline-block;padding:1px 5px;border-radius:8px;font-size:.6em;cursor:pointer;border:1px solid rgba(255,255,255,.12);white-space:nowrap;color:#bbb;background:rgba(255,255,255,.04);line-height:1.4}
+.word-chip:hover{background:rgba(0,212,255,.2);border-color:#00d4ff;color:#fff}
+.nav-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:200}
+.nav-btn{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:transparent;cursor:pointer;transition:all .3s}
+.nav-btn.active{background:#00d4ff;border-color:#00d4ff;transform:scale(1.3)}
+.arrows{position:fixed;top:50%;transform:translateY(-50%);z-index:200;width:100%;display:flex;justify-content:space-between;padding:0 24px;pointer-events:none}
+.arrow{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);color:#d0d0ff;font-size:1.6em;cursor:pointer;pointer-events:all;transition:all .3s;display:flex;align-items:center;justify-content:center}
+.arrow:hover{background:rgba(0,212,255,.25);border-color:#00d4ff;color:#fff;transform:scale(1.12)}
+.arrow:disabled{opacity:0;pointer-events:none}
+.progress-bar{position:fixed;top:0;left:0;height:4px;background:linear-gradient(90deg,#00d4ff,#7b2ff7);transition:width .6s;z-index:300}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hint{font-size:.72em;color:#889;margin-top:4px;text-align:center}
+@media(max-width:768px){
+  #title h1{font-size:2.5em}
+  .chapter-slide h2{font-size:1.8em}
+  .chapter-slide .content-grid{grid-template-columns:1fr}
+  .right-panel{width:220px;bottom:8px;right:8px;height:200px}
+  .wordcloud-card{padding:6px 8px}
+  .concept-detail{flex-direction:column;padding:12px}
+  .cd-image{width:100%;max-height:140px}
+  .cd-desc{font-size:1em}
+  .cd-title{font-size:1.2em}
+}
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progressBar"></div>
+<div class="hint" style="position:fixed;bottom:20px;left:20px;z-index:300;">← 點擊概念查看說明 | ▾ 收合公式/提示 | 點擊圖片放大．滾輪縮放</div>
+
+<div class="slide active" id="slide0">
+  <div id="title" style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+    <h1>🔬 應用力學</h1>
+    <p>互動式教學簡報 — 即時文字雲回饋系統</p>
+    <p style="margin-top:40px;font-size:.9em;color:#667;">點擊右側箭頭或下方導航點開始</p>
+    <div style="margin-top:20px;display:flex;gap:15px;flex-wrap:wrap;justify-content:center;">
+      <span style="background:rgba(255,255,255,.1);padding:6px 14px;border-radius:20px;font-size:.85em;">靜力學</span>
+      <span style="background:rgba(255,255,255,.1);padding:6px 14px;border-radius:20px;font-size:.85em;">運動學</span>
+      <span style="background:rgba(255,255,255,.1);padding:6px 14px;border-radius:20px;font-size:.85em;">動力學</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// Firebase Config
+firebase.initializeApp({
+  apiKey: "AIzaSyDDnuNi__Bey1A8s_E76TkQrkuL9wwd0rI",
+  authDomain: "mechanics-wordcloud-2026.firebaseapp.com",
+  databaseURL: "https://mechanics-wordcloud-2026-default-rtdb.firebaseio.com",
+  projectId: "mechanics-wordcloud-2026",
+  storageBucket: "mechanics-wordcloud-2026.firebasestorage.app",
+  appId: "1:1091720210556:web:d1134aae66f46145ef41f9"
+});
+const db = firebase.database();
+
+// Chapter data
+const chapters = [
+  {title:"緒論",num:1,concepts:["靜力學","運動學","動力學","內力","外力","剛體","質點","向量","純量","MKS","CGS","FPS","牛頓","力系","集中力","均佈力","超距力"],formulas:["ΣM = 0, ΣF = 0","F = ma","R = w × L","R = ½wL"],keyPoints:["力的三要素：大小、方向、作用點","力學分為靜力學、運動學、動力學","1 N = 10⁵ dyne"]},
+  {title:"同平面力系",num:2,concepts:["力的分解","力的合成","平行四邊形法","三角形法","正弦定理","拉密定理","自由體圖","力矩","力偶","平衡","滑輪","張力"],formulas:["R = √(P²+Q²+2PQ cosθ)","M = F·d","C = F·d","ΣM=0, ΣFx=0, ΣFy=0"],keyPoints:["合力大小未必大於分力","逆時針力矩為正","自由體圖(FBD)繪製要領"]},
+  {title:"摩擦",num:3,concepts:["靜摩擦","動摩擦","摩擦係數","摩擦角","靜止角","滾動摩擦","皮帶輪","螺旋千斤頂","尖劈","煞車","離合器","自鎖"],formulas:["f = μN","tanφ = μ","Fᵣ = W×a/r","T_H = T_L·e^μα"],keyPoints:["摩擦力與面積無關","靜摩擦係數 > 動摩擦係數","μₛ > μₖ > μᵣ"]},
+  {title:"直線運動",num:4,concepts:["位移","速度","速率","加速度","等加速度","自由落體","重力加速度","相對運動","垂直上拋","拋體運動","水平拋射","斜向拋射"],formulas:["V = V₀+at","S = V₀t+½at²","V² = V₀²+2aS","g = 9.8 m/s²"],keyPoints:["V-t圖面積=位移","自由落體：V=gt","拋體運動水平等速"]},
+  {title:"角位移與角速度",num:5,concepts:["角位移","角速度","角加速度","切線速度","法線加速度","向心加速度","等角加速度","圓周運動","rpm","徑度"],formulas:["ω = 2πN/60","Vₜ = rω","aₙ = rω² = V²/r","a = √(aₜ²+aₙ²)"],keyPoints:["等速率圓周：α=0","法線加速度改變方向","切線加速度改變大小"]},
+  {title:"動力學基本定律",num:6,concepts:["慣性定律","運動定律","反作用力","電梯問題","滑輪系統","向心力","離心力","圓錐擺","簡諧運動","SHM","彎道設計","外軌起高"],formulas:["F = ma","F = mV²/r","V = √(μgr)","h = dV²/gr","a(t)=-ω²X(t)"],keyPoints:["F=ma為核心","SHM：圓周投影","外軌起高抵消離心力"]},
+  {title:"功與能",num:7,concepts:["功","動能","位能","重力位能","彈性位能","功率","馬力","能量守恆","機械效率","慣性矩","迴轉半徑"],formulas:["W = F·S","Eₖ = ½mV²","Eₚ = mgh","U = ½kX²","η = Wₒ/Wᵢ×100%"],keyPoints:["能量可相互轉換","機械效率恆小於1","位能與路徑無關"]}
+];
+
+// ===== Concept Knowledge Database =====
+const conceptDB = {
+  // Ch1 緒論
+  "靜力學":"研究物體在平衡狀態下的受力作用。靜力學的核心是平衡條件：合力為零、合力矩為零。涉及空間、質量、力三個要素。|ΣM=0, ΣF=0|page_02",
+  "運動學":"研究物體運動狀態的改變（如速度或位移），不考慮引起運動的力。涉及時間、空間、位移三個要素。|V=ΔS/Δt|page_18",
+  "動力學":"研究物體之運動狀態及其改變因素，結合力與運動的關係。涉及力、時間、空間、質量四個要素。核心定律為 F=ma。|F=ma|page_02",
+  "內力":"物體內部產生的抵抗力，不具備「力的可傳性」，通常在材料力學中探討。|—|page_02",
+  "外力":"來自物體外部的力。在應用力學中，外力具備「力的可傳性」，可沿作用線移動而不改變外效應。|—|page_02",
+  "剛體":"物體受外力作用時，其形狀及大小均不改變；亦即物體內任兩點間的距離保持不變。|—|page_02",
+  "質點":"僅具有「位置」與「質量」的理想化模型，忽略其形狀與大小。|—|page_02",
+  "向量":"同時具備大小與方向的物理量。例如：力、力矩、位移、速度、加速度。向量加法滿足平行四邊形法則。|R=√(P²+Q²+2PQcosθ)|page_03",
+  "純量":"僅具大小的物理量。例如：時間、溫度、體積、質量、功、能量。|—|page_03",
+  "MKS":"絕對單位系統之一（SI制）。長度單位為公尺（m）、質量單位為公斤（kg）、時間單位為秒（s）。力的單位為牛頓（N）。|1N=1kg·m/s²|page_04",
+  "CGS":"絕對單位系統之一。長度單位為公分（cm）、質量單位為公克（g）、時間單位為秒（s）。力的單位為達因（dyne）。|1N=10⁵dyne|page_04",
+  "FPS":"絕對單位系統之一。長度單位為呎（ft）、質量單位為磅（lb）、時間單位為秒（s）。力的單位為 poundal。|1N=7.233poundal|page_04",
+  "牛頓":"力的單位，1牛頓即使1公斤物體產生1m/s²加速度所需之力。Isaac Newton 提出三大運動定律與萬有引力定律。|1N=1kg·m/s²|page_04",
+  "力系":"作用於同一物體上之一群力的組合。依空間分佈可分為同平面力系與空間力系；依是否共點可分為共點力系與不共點力系。|—|page_05",
+  "集中力":"作用於一點的力，為理想化的力學模型。實際應用中，若受力面積相對於整體尺寸極小，可視為集中力。|—|page_02",
+  "均佈力":"荷重均勻分佈於某一長度或面積上。若強度為w(N/m)，長度為L，則合力R=w×L，作用於重心（中間位置）。|R=w×L|page_02",
+  "超距力":"兩物體不需接觸即可產生的力。例如：地心引力、磁力、靜電力。與接觸力相對。|F=G·Mm/r²|page_02",
+  // Ch2 同平面力系
+  "力的分解":"一力可分解為兩個力，或在無限制之下可分解為無限多個力。常用方法有夾角式（矩形分量）與比例式。|Fx=Fcosθ, Fy=Fsinθ|page_06",
+  "力的合成":"將一力系以一單力（合力）取代而不改變其外效應。注意：合力的大小未必大於分力！|R=√(P²+Q²+2PQcosθ)|page_06",
+  "平行四邊形法":"以兩力為邊構成平行四邊形，其對角線即為合力。為向量加法之幾何表示。|—|page_06",
+  "三角形法":"將第二力的尾部接在第一力的箭頭處，由第一力起點指向第二力終點的向量即為合力。|—|page_06",
+  "正弦定理":"三角形中各邊長與其對角正弦值成比例。用於已知兩角一邊或兩邊一角求解三角形。|a/sinα = b/sinβ = c/sinγ|page_06",
+  "拉密定理":"三力平衡時，各力與其相對角的正弦值成比例。為正弦定理在力學中的應用。|FA/sinα = FB/sinβ = FC/sinγ|page_06",
+  "自由體圖":"將物體自其約束中分離出來，單獨畫出該物體並標示所有作用力之受力分析圖。FBD是解決力學問題的第一步。|ΣM=0, ΣFx=0, ΣFy=0|page_07",
+  "力矩":"一物體受外力作用時，對某點或某軸線所產生的「轉動量」。規定：逆時針方向為正。|M=F·d|page_08",
+  "力偶":"大小相等、方向相反、作用在不同直線上之兩平行力所構成的力系。力偶矩與參考點位置無關。|C=F·d|page_08",
+  "平衡":"物體處於靜止或等速度直線運動的狀態。平衡條件為合力為零且合力矩為零。|ΣM=0, ΣFx=0, ΣFy=0|page_09",
+  "滑輪":"可繞軸旋轉的輪狀機械元件。同一條繩子各處張力相同，利用此原理可改變力的方向與大小。|T₁=T₂(同繩)|page_08",
+  "張力":"繩索、纜線或鏈條內部傳遞的拉力。方向沿繩索方向，箭頭由物體指向繩索外側。|T=F|page_07",
+  // Ch3 摩擦
+  "靜摩擦":"物體尚未滑動時接觸面產生的摩擦力。靜摩擦力等於作用力（有效推力），有最大值。|fs=μs·N|page_10",
+  "動摩擦":"物體滑動後接觸面產生的摩擦力。動摩擦係數小於靜摩擦係數。|fk=μk·N|page_10",
+  "摩擦係數":"摩擦力與正壓力之比值。靜摩擦係數>動摩擦係數>滾動摩擦係數。摩擦係數與接觸面積無關，與接觸面性質有關。|μ=f/N|page_10",
+  "摩擦角":"接觸面垂直正壓力(N)與合力(R)之夾角φ。摩擦角的正切值等於摩擦係數。|tanφ=μ|page_11",
+  "靜止角":"將物體置於斜面上，使物體即將自動下滑的臨界傾斜角度θ，其正切值等於靜摩擦係數。|tanθ=μs|page_11",
+  "滾動摩擦":"物體滾動時產生的摩擦阻力。滾動摩擦係數遠小於滑動摩擦係數，故滾動比滑動省力。|Fr=W×a/r|page_10",
+  "皮帶輪":"利用皮帶與輪面間的摩擦力傳遞動力。緊邊張力TH與鬆邊張力TL之比值取決於摩擦係數與包角。|TH=TL·e^μα|page_14",
+  "螺旋千斤頂":"利用螺旋原理將旋轉運動轉換為直線運動，以舉起重物。需考慮螺紋面之摩擦。|R=W·tan(φs±θ)|page_14",
+  "尖劈":"一斜面體，藉由敲擊或施力將其打入縫隙中以產生巨大推力。自鎖條件為楔角小於摩擦角。|—|page_15",
+  "煞車":"利用摩擦力將運動物體的動能轉換為熱能，以達到減速或停止之目的。|—|page_16",
+  "離合器":"控制動力傳遞接合或分離的機械裝置。利用摩擦力將驅動軸之扭矩傳遞至從動軸。|T=μF×n×rm|page_17",
+  "自鎖":"在無外力作用下，物體因摩擦力而自行保持靜止不動的現象。自鎖條件：驅動力方向在摩擦角以內。|θ<φ|page_11",
+  // Ch4 直線運動
+  "位移":"運動的起點與終點間「直線」（最短）的距離與方向。為一向量。|ΔS=S₂-S₁|page_18",
+  "速度":"單位時間內「位移」的變化量。為一向量，方向與位移方向相同。平均速度 V=ΔS/Δt。|V=ΔS/Δt|page_18",
+  "速率":"單位時間內「路徑」的變化量。為一純量，僅有大小無方向。平均速率 v=L/t。|v=L/t|page_18",
+  "加速度":"單位時間內速度的變化量。等加速度運動中，V-t圖為一斜直線，斜率即為加速度。|a=ΔV/Δt|page_19",
+  "等加速度":"加速度為定值的運動。V-t圖為斜直線，S-t圖為拋物線。三大運動公式為解題基礎。|V=V₀+at, S=V₀t+½at², V²=V₀²+2aS|page_19",
+  "自由落體":"一物體由「靜止」狀態開始僅受重力作用垂直落下之運動。為等加速度直線運動之特例。|V=gt, h=½gt², V²=2gh|page_20",
+  "重力加速度":"地球表面物體受重力作用所產生的加速度。標準值為9.8m/s²。因地球自轉與緯度不同略有差異。|g=9.8m/s²|page_20",
+  "相對運動":"從不同參考座標系觀測同一物體運動時所呈現的運動狀態差異。相對速度 VAB=VA-VB。|VAB=VA-VB|page_21",
+  "垂直上拋":"物體以初速V₀垂直向上拋出，受重力減速至最高點後加速下落。上升與下落時間相等。|V=V₀-gt, h=V₀t-½gt²|page_20",
+  "拋體運動":"物體被拋出後僅受重力作用的運動。水平方向為等速度，垂直方向為等加速度。軌跡為拋物線。|—|page_22",
+  "水平拋射":"物體以水平初速拋出。水平距離 R=V₀·t，滯空時間由高度決定 t=√(2h/g)。|R=V₀√(2h/g)|page_22",
+  "斜向拋射":"物體以與水平夾角θ之速度拋出。最大射程在θ=45°時達到。|R=V₀²sin2θ/g, H=V₀²sin²θ/2g|page_22",
+  // Ch5 角位移與角速度
+  "角位移":"物體繞某軸旋轉的角度變化量。單位為弧度(rad)或度(°)。徑度為SI單位。|θ=S/r|page_23",
+  "角速度":"單位時間內角位移的變化量。常用單位為 rad/s 或 rpm。N為每分鐘轉速。|ω=θ/t=2πN/60|page_23",
+  "角加速度":"單位時間內角速度的變化量。等角加速度運動與等加速度直線運動公式形式相同。|α=Δω/Δt|page_23",
+  "切線速度":"圓周運動中，物體沿切線方向的瞬時速度。大小等於半徑乘以角速度。|Vt=r·ω|page_23",
+  "法線加速度":"圓周運動中，指向圓心的加速度，又稱向心加速度。僅改變速度方向，不改變大小。|an=r·ω²=V²/r|page_23",
+  "向心加速度":"物體做圓周運動時指向圓心的加速度。即使等速率圓周運動也有向心加速度。|ac=V²/r=rω²|page_23",
+  "等角加速度":"角加速度為定值的旋轉運動。三公式與直線運動等加速度公式形式完全相同。|ω=ω₀+αt, θ=ω₀t+½αt², ω²=ω₀²+2αθ|page_23",
+  "圓周運動":"物體沿圓形路徑的運動。可分為等速率圓周運動（α=0，僅有向心加速度）與變速率圓周運動。|a=√(at²+an²)|page_23",
+  "rpm":"每分鐘轉數（revolutions per minute），為常見的轉速單位。換算為角速度：ω=2πN/60。|N(rpm)→ω=2πN/60|page_23",
+  "徑度":"弧長等於半徑時的圓心角大小，為角度的SI單位。一圈=2π徑度=360°。|πrad=180°|page_23",
+  // Ch6 動力學基本定律
+  "慣性定律":"牛頓第一運動定律：物體若不受外力作用，靜者恆靜、動者恆做等速度直線運動。又稱慣性定律。|—|page_24",
+  "運動定律":"牛頓第二運動定律：物體所受外力等於其質量與加速度之乘積。為古典力學的核心。|F=ma|page_24",
+  "反作用力":"牛頓第三運動定律：所有作用力必有大小相等、方向相反之反作用力。力不可單獨存在。|F₁=-F₁'|page_24",
+  "電梯問題":"分析電梯加速上升或下降時，人對地板的感知體重變化。加速上升時體重增加，加速下降時體重減輕。|N=m(g±a)|page_24",
+  "滑輪系統":"利用動滑輪與定滑輪組合改變力的方向與大小。動滑輪可省力，定滑輪改變方向。同繩張力相等。|a=(M-m)g/(M+m), T=2Mm·g/(M+m)|page_25",
+  "向心力":"物體做圓周運動時，指向圓心的淨力。由繩張力、重力、摩擦力等提供。|Fc=mV²/r|page_28",
+  "離心力":"向心力之反作用力，作用在提供向心力的物體上。注意：離心力並非作用於做圓周運動之物體。|—|page_28",
+  "圓錐擺":"擺錘做水平圓周運動的單擺。繩索掃出一圓錐面。向心力由繩張力的水平分量提供。|tanθ=V²/gr|page_28",
+  "簡諧運動":"物體在恢復力作用下進往復運動，其位移為時間的正弦或餘弦函數。圓周運動之投影即為SHM。|a(t)=-ω²X(t)|page_29",
+  "SHM":"Simple Harmonic Motion 簡諧運動。特徵：加速度與位移成正比且方向相反。週期與振幅無關。|T=2π√(m/k)|page_29",
+  "彎道設計":"為防止車輛轉彎時側滑，彎道外側需高於內側，使路面傾斜角產生的向心力足夠。|tanθ=V²/gr|page_30",
+  "外軌起高":"鐵路彎道處外側軌道高於內側軌道的高度差。使列車通過時重力分量提供所需向心力。|h=dV²/gr|page_30",
+  // Ch7 功與能
+  "功":"力與沿力方向位移之乘積。功為純量，單位為焦耳(J)。若力與位移夾角為θ，則W=F·S·cosθ。|W=F·S|page_31",
+  "動能":"物體因運動而具有的能量。與質量成正比，與速度平方成正比。|Ek=½mV²|page_32",
+  "位能":"物體因位置或狀態而具有的能量。可分為重力位能（位置）與彈性位能（形變）。|Ep=mgh|page_32",
+  "重力位能":"物體因高度而具有的位能。參考平面可任意選定，位能差才有物理意義。|Ep=mgh|page_32",
+  "彈性位能":"彈性體因形變而儲存的位能。與彈性係數k成正比，與形變量X平方成正比。|U=½kX²|page_34",
+  "功率":"單位時間內所作之功。常用單位有瓦特(W)、馬力(PS/HP)。|P=W/t=F·V=T·ω|page_35",
+  "馬力":"功率的常用單位。1PS（公制馬力）=735.5W，1HP（英制馬力）=746W。|1PS=735.5W, 1HP=746W|page_35",
+  "能量守恆":"封閉系統中，能量不會憑空產生或消失，只能從一種形式轉換為另一種形式。力學中即力學能守恆。|½mV₁²+mgh₁=½mV₂²+mgh₂|page_35",
+  "機械效率":"輸出功與輸入功之比值。機械效率恆小於1，差值即為摩擦損失。|η=Wo/Wi×100%|page_35",
+  "慣性矩":"又稱轉動慣量，衡量物體對旋轉運動的慣性大小。與質量分佈有關，質量離軸越遠慣性矩越大。|I=Σmr²|page_33",
+  "迴轉半徑":"將物體質量假想集中於一點，此點至旋轉軸之距離。慣性矩等於總質量乘以迴轉半徑平方。|k=√(I/m)|page_33"
+};
+
+function getConceptInfo(concept){
+  const raw = conceptDB[concept];
+  if(!raw) return null;
+  const parts = raw.split('|');
+  return { desc: parts[0] || '', formula: parts[1] || '', img: parts[2] || '' };
+}
+
+// ===== Concept detail in slide =====
+function showConcept(concept, chapterTitle){
+  const info = getConceptInfo(concept);
+  if(!info) return;
+  const slideIdx = currentSlide - 1;
+  if(slideIdx < 0) return;
+  const cd = document.getElementById(`cd-${slideIdx}`);
+  cd.classList.add('open');
+  document.getElementById(`cd-title-${slideIdx}`).textContent = concept;
+  document.getElementById(`cd-chapter-${slideIdx}`).textContent = `📖 ${chapterTitle}`;
+  document.getElementById(`cd-desc-${slideIdx}`).textContent = info.desc;
+  const f = document.getElementById(`cd-formula-${slideIdx}`);
+  if(info.formula && info.formula !== '—'){ f.textContent = info.formula; f.style.display = 'block'; }
+  else f.style.display = 'none';
+  const im = document.getElementById(`cd-img-${slideIdx}`);
+  if(info.img){ im.src = `pdf_pages/${info.img}.png`; im.style.display = ''; }
+  else im.style.display = 'none';
+}
+function hideConcept(slideIdx){
+  const cd = document.getElementById(`cd-${slideIdx}`);
+  if(cd) cd.classList.remove('open');
+}
+function toggleSection(btn){
+  const content = btn.parentElement.nextElementSibling;
+  if(!content) return;
+  const isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? '' : 'none';
+  btn.textContent = isHidden ? '▲' : '▾';
+}
+function zoomImage(img){
+  let overlay = document.getElementById('imgZoomOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'imgZoomOverlay';
+    overlay.className = 'img-zoom-overlay';
+    const wrap = document.createElement('div');
+    wrap.id = 'zoomWrap';
+    wrap.style.cssText = 'position:relative;display:inline-block;';
+    overlay.appendChild(wrap);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'img-zoom-close';
+    closeBtn.innerHTML = '✕';
+    closeBtn.title = '關閉 (Esc)';
+    overlay.appendChild(closeBtn);
+    function closeZoom(){
+      overlay.classList.remove('open');
+      document.getElementById('zoomWrap').style.cssText = 'position:relative;display:inline-block;';
+      const zi = document.getElementById('zoomImg');
+      zi.style.width = ''; zi.style.height = '';
+    }
+    closeBtn.onclick = closeZoom;
+    let dragData = null;
+    function dragMove(e){
+      if(!dragData) return;
+      const dx = e.clientX - dragData.sx;
+      const dy = e.clientY - dragData.sy;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) dragData.moved = true;
+      const w = document.getElementById('zoomWrap');
+      w.style.left = (dragData.startL + dx) + 'px';
+      w.style.top = (dragData.startT + dy) + 'px';
+    }
+    function dragEnd(){
+      if(!dragData) return;
+      dragData = null;
+      document.onmousemove = null;
+      document.onmouseup = null;
+      overlay.classList.remove('dragging');
+    }
+    overlay.onmousedown = function(e){
+      if(e.target.closest('.img-zoom-close')) return;
+      const w = document.getElementById('zoomWrap');
+      dragData = { sx: e.clientX, sy: e.clientY, startL: parseInt(w.style.left)||0, startT: parseInt(w.style.top)||0, moved: false };
+      overlay.classList.add('dragging');
+      document.onmousemove = dragMove;
+      document.onmouseup = dragEnd;
+    };
+    const zoomImg = document.createElement('img');
+    zoomImg.id = 'zoomImg';
+    wrap.appendChild(zoomImg);
+    overlay.addEventListener('wheel', function(e){
+      e.preventDefault();
+      const zi = document.getElementById('zoomImg');
+      if(!zi.complete || zi.naturalWidth === 0) return;
+      const scale = e.deltaY > 0 ? 0.9 : 1.1;
+      const newW = Math.round(zi.offsetWidth * scale);
+      zi.style.width = Math.max(200, Math.min(newW, 10000)) + 'px';
+      zi.style.height = 'auto';
+    }, {passive: false});
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('zoomWrap').style.cssText = 'position:relative;display:inline-block;';
+  const zi = document.getElementById('zoomImg');
+  zi.style.maxWidth = 'none';
+  zi.style.maxHeight = 'none';
+  zi.onload = function(){
+    this.style.width = Math.min(90 * window.innerWidth / 100, this.naturalWidth) + 'px';
+  };
+  zi.src = img.src;
+  overlay.classList.add('open');
+  if(zi.complete && zi.naturalWidth > 0) zi.onload();
+}
+if(!window._zoomEscRegistered){
+  window._zoomEscRegistered = true;
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){
+      const o = document.getElementById('imgZoomOverlay');
+      if(o && o.classList.contains('open')) o.querySelector('.img-zoom-close')?.click();
+    }
+  });
+}
+
+let currentSlide = 0;
+const totalSlides = chapters.length + 1;
+let currentContext = "應用力學";
+let firebaseListener = null;
+
+// ===== Slide rendering =====
+function renderSlides(){
+  document.querySelectorAll('.slide:not(#slide0)').forEach(s=>s.remove());
+  chapters.forEach((ch,i)=>{
+    const s=document.createElement('div');s.className='slide chapter-slide';s.id=`slide${i+1}`;
+    s.innerHTML=`<div class="chapter-num">第 ${ch.num} 章</div><h2>${ch.title}</h2>
+      <div class="content-grid">
+        <div class="content-card"><h3>📖 核心概念</h3><ul>${ch.concepts.map(c=>`<li data-concept="${c}" onclick="showConcept('${c.replace(/'/g,"\\'")}','${ch.title}')">${c}</li>`).join('')}</ul></div>
+        <div class="content-card"><h3>📐 重要公式 <button class="toggle-btn" onclick="toggleSection(this)">▾</button></h3><div class="cd-formulas">${ch.formulas.map(f=>`<div class="formula-box">${f}</div>`).join('')}</div>
+          <h3 style="margin-top:15px;color:#ffd700;">💡 重點提示 <button class="toggle-btn" onclick="toggleSection(this)">▾</button></h3><ul>${ch.keyPoints.map(k=>`<li>${k}</li>`).join('')}</ul></div>
+        <div class="concept-detail" id="cd-${i}">
+          <div class="cd-left">
+            <div class="cd-title"><span id="cd-title-${i}"></span><button class="cd-close" onclick="hideConcept(${i})">✕</button></div>
+            <div class="cd-chapter" id="cd-chapter-${i}"></div>
+            <div class="cd-desc" id="cd-desc-${i}"></div>
+            <div class="cd-formula" id="cd-formula-${i}"></div>
+          </div>
+          <img class="cd-image" id="cd-img-${i}" alt="" onclick="zoomImage(this)">
+        </div>
+      </div>`;
+    document.body.insertBefore(s,document.querySelector('.right-panel'));
+  });
+  renderNav();goToSlide(0);
+}
+
+function renderNav(){
+  document.querySelector('.nav-bar')?.remove();
+  const n=document.createElement('div');n.className='nav-bar';
+  for(let i=0;i<totalSlides;i++){const b=document.createElement('button');b.className='nav-btn';b.onclick=()=>goToSlide(i);n.appendChild(b)}
+  document.body.appendChild(n);
+  const a=document.createElement('div');a.className='arrows';
+  a.innerHTML=`<button class="arrow" id="prevArrow" onclick="goToSlide(currentSlide-1)">◀</button><button class="arrow" id="nextArrow" onclick="goToSlide(currentSlide+1)">▶</button>`;
+  document.querySelector('.arrows')?.remove();document.body.appendChild(a);
+}
+
+function goToSlide(n){
+  if(n<0||n>=totalSlides)return;
+  currentSlide=n;
+  document.querySelectorAll('.concept-detail').forEach(cd=>cd.classList.remove('open'));
+  document.querySelectorAll('.slide').forEach((s,i)=>s.classList.toggle('active',i===n));
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>b.classList.toggle('active',i===n));
+  document.getElementById('prevArrow').disabled=n===0;
+  document.getElementById('nextArrow').disabled=n===totalSlides-1;
+  document.getElementById('progressBar').style.width=`${((n+1)/totalSlides)*100}%`;
+  // Update context
+  const ctx = n===0?"應用力學":chapters[n-1].title;
+  currentContext = ctx;
+  document.getElementById('contextLabel').textContent = ctx;
+  // Reload word cloud for this context
+  loadWordCloud();
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();goToSlide(currentSlide+1)}
+  if(e.key==='ArrowLeft'){e.preventDefault();goToSlide(currentSlide-1)}
+});
+let touchStartX=0;
+document.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX});
+document.addEventListener('touchend',e=>{
+  const diff=touchStartX-e.changedTouches[0].clientX;
+  if(Math.abs(diff)>50){if(diff>0)goToSlide(currentSlide+1);else goToSlide(currentSlide-1)}
+});
+
+// ===== Word Cloud — Custom HTML5 renderer (no external library) =====
+const WC_COLORS = ['#00d4ff','#7b2ff7','#ffd700','#ff6b6b','#51cf66','#ff922b','#ffa94d','#845ef7'];
+
+function hashColor(word){
+  let h = 0;
+  for(let i=0;i<word.length;i++) h = (h*31 + word.charCodeAt(i)) % WC_COLORS.length;
+  return WC_COLORS[h];
+}
+
+function submitWord(){
+  const input = document.getElementById('wordInput');
+  const word = input.value.trim();
+  if(!word) return;
+  const ref = db.ref('words').child(currentContext).child(word);
+  ref.transaction(current => (current||0)+1);
+  input.value = '';
+}
+
+document.getElementById('wordInput')?.addEventListener('keydown', e => {
+  if(e.key === 'Enter') submitWord();
+});
+
+function loadWordCloud(){
+  if(firebaseListener) {
+    firebaseListener.off();
+    firebaseListener = null;
+  }
+  const container = document.getElementById('wordcloud-container');
+  container.innerHTML = '<div style="color:#556;font-size:.85em;text-align:center;padding:20px;">載入中...</div>';
+  document.getElementById('word-options').innerHTML = '';
+  const ref = db.ref('words').child(currentContext);
+  firebaseListener = ref;
+  ref.on('value', snapshot => {
+    renderCloud(snapshot.val() || {});
+  });
+}
+
+function renderCloud(data){
+  const container = document.getElementById('wordcloud-container');
+  const opts = document.getElementById('word-options');
+  if(!container) return;
+  let words = Object.entries(data).filter(([w]) => w && w.trim());
+  if(words.length === 0){
+    container.innerHTML = '<div style="color:#556;font-size:.85em;text-align:center;padding:20px;">尚無關鍵字，請在上方輸入</div>';
+    if(opts) opts.innerHTML = '';
+    return;
+  }
+  words.sort((a,b) => b[1] - a[1]);
+  const maxWeight = Math.max(...words.map(w=>w[1]), 1);
+  
+  // Render word cloud
+  container.innerHTML = '';
+  words.forEach(([word, count]) => {
+    const el = document.createElement('span');
+    el.className = 'wc-word';
+    const ratio = count / maxWeight;
+    const size = 10 + Math.pow(ratio, 0.4) * 30;
+    const opacity = 0.5 + ratio * 0.5;
+    el.style.fontSize = `${size}px`;
+    el.style.color = hashColor(word);
+    el.style.opacity = opacity;
+    el.textContent = word;
+    el.title = `${word}: ${count} 次`;
+    el.addEventListener('click', () => {
+      db.ref('words').child(currentContext).child(word).transaction(c => (c||0)+1);
+    });
+    container.appendChild(el);
+  });
+  
+  // Render option chips
+  if(opts){
+    opts.innerHTML = '';
+    const ctx = currentContext;
+    words.forEach(([word, count]) => {
+      const chip = document.createElement('span');
+      chip.className = 'word-chip';
+      chip.textContent = word;
+      chip.title = `點擊 +1（目前 ${count} 次）`;
+      chip.addEventListener('click', () => {
+        db.ref('words').child(ctx).child(word).transaction(c => (c||0)+1);
+      });
+      opts.appendChild(chip);
+    });
+  }
+}
+
+// ===== Clean corrupted data =====
+// ===== Clear word cloud =====
+function clearWordCloud(){
+  if(confirm(`確定清空「${currentContext}」的所有關鍵字？`)){
+    db.ref('words').child(currentContext).remove();
+  }
+}
+
+function cleanCorruptedData(){
+  const ref = db.ref('words');
+  ref.once('value', snapshot => {
+    const data = snapshot.val();
+    if(!data) return;
+    Object.keys(data).forEach(key => {
+      // Remove entries with garbled characters (containing '?')
+      if(key.includes('?') || /[\u0000-\u001F]/.test(key)){
+        ref.child(key).remove();
+        console.log('Removed corrupted entry:', key);
+      }
+    });
+  });
+}
+</script>
+
+<div class="right-panel">
+  <div class="wordcloud-card">
+    <h3>☁️ 即時文字雲 — <span id="contextLabel">應用力學</span></h3>
+    <div id="wordcloud-container"></div>
+    <div class="wc-bar">
+      <input type="text" id="wordInput" placeholder="輸入關鍵字..." maxlength="20">
+      <button class="wc-submit" onclick="submitWord()">送出</button>
+      <button class="wc-clear" onclick="clearWordCloud()" title="清空本章所有關鍵字">✕</button>
+    </div>
+    <div id="word-options"></div>
+  </div>
+</div>
+<script>
+// ===== Init =====
+renderSlides();
+cleanCorruptedData();
+</script>
+</body>
+</html>
