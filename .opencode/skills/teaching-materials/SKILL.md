@@ -1,11 +1,11 @@
-# 應用力學教學應用懶人包
+# 教學教材應用懶人包
 
 ## 功能
-- 從 PDF 掃描檔 OCR 提取力學筆記內容
+- 從 PDF 掃描檔 OCR 提取教材筆記內容
 - 自動生成各章節 DOCX 教學文件（含 OMML 數學公式）
 - 自動生成各章節 PDF 教材
-- 上傳至 NotebookLM 建立「力學教學」筆記本
-- 同步至 Obsidian 力學教學資料夾
+- 上傳至 NotebookLM 建立「教材教學」筆記本
+- 同步至 Obsidian 教材教學資料夾
 - 建立互動式 HTML 簡報（含 Firebase 即時文字雲）
 - 一鍵部署至 Firebase Hosting
 
@@ -21,7 +21,7 @@
 #### 1. 從 PDF 提取文字內容
 ```bash
 # 使用 NotebookLM MCP 上傳 PDF 並查詢
-notebooklm source_add source_type=file file_path=力學筆記.pdf wait=true
+notebooklm source_add source_type=file file_path=教材筆記.pdf wait=true
 notebooklm query query="列出所有章節與內容"
 ```
 
@@ -38,12 +38,12 @@ python convert_docx_to_pdf.py
 #### 4. 上傳至 NotebookLM
 ```bash
 # 建立筆記本並上傳各章節 PDF
-notebooklm notebook_create title=力學教學
+notebooklm notebook_create title=教材教學
 notebooklm source_add notebook_id=<ID> source_type=file file_path=output/*.pdf
 ```
 
 #### 5. 同步至 Obsidian
-- 將 `obsidian/` 目錄內容複製至 Obsidian Vault 的 `力學教學/` 資料夾
+- 將 `obsidian/` 目錄內容複製至 Obsidian Vault 的 `教材教學/` 資料夾
 
 #### 6. 建立互動簡報
 ```bash
@@ -53,7 +53,7 @@ firebase deploy --only hosting
 
 ### 目錄結構
 ```
-應用力學教學資料測試/
+教學教材資料/
 ├── chapters/              # 各章節 Markdown 原始檔
 ├── output/                # 產出 DOCX + PDF
 ├── presentation/          # HTML 互動簡報
