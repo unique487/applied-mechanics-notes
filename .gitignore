@@ -1,0 +1,7 @@
+# 暫存檔案
+~$*
+*.tmp
+
+# 系統
+.DS_Store
+Thumbs.db
