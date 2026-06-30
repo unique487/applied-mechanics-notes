@@ -5,3 +5,6 @@
 # 系統
 .DS_Store
 Thumbs.db
+
+# PDF 超過 GitHub 上限（57MB），僅留本地
+力學筆記(新).pdf
